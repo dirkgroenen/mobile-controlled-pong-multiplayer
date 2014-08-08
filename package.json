@@ -1,0 +1,10 @@
+{
+    "name": "mobilecontrolledpong", 
+    "version": "0.0.1", 
+    "dependencies": {
+        "socket.io": "latest",
+        "express": "latest",
+        "http": "latest",
+        "node-uuid": "latest"
+    }
+}

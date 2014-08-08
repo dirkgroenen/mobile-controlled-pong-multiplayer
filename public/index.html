@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Pong - TakeTwo</title>
+        
+        
+        <!-- load all scripts -->
+        <script src="/socket.io/socket.io.js"></script>
+        <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+        <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+        
+        <script>
+            var Player = function(uuid){
+                this.id = uuid;
+                this.online = false;
+                this.roomid = null;
+                this.mobilesocket = null;
+            };
+            
+        
+            $(document).ready(function(){
+                var socket = io.connect("192.168.2.21");
+                var client;
+                    
+                // Hide all steps
+                $(".step").hide();
+                    
+                // Connect to the server and ask a list of rooms
+                socket.emit("connect desktop", function(data){
+                    client = new Player(data.uuid);
+                    client.online = true;
+                    
+                    $(".step#one").show();
+                });
+                
+                // Listen for roomlist updates
+                socket.on("update roomlist", function(data){
+                    $("ul.roomlist li").remove();
+                    
+                    data.roomlist.forEach(function(id){
+                        $("ul.roomlist").append("<li><a href='#" + id + "' data-id='" + id + "' class='joinroom'>" + id + "</a></li>");
+                    });
+                    
+                });
+                
+                // Listen for palyerlist updates
+                socket.on("update playerlist", function(data){
+                    $("ul.playerlist li").remove();
+                    
+                    data.playerlist.forEach(function(playerid){
+                        $("ul.playerlist").append("<li><a href='#" + playerid + "' data-id='" + playerid + "' class='joinroom'>" + playerid + "</a></li>");
+                    });
+                    
+                    if(data.playerlist.length > 0){
+                        $("input[name='startgame']").show();
+                    }
+                });
+                
+                // Create a new room
+                $("a.startnew").click(function(e){
+                    e.preventDefault();
+                    
+                    socket.emit("create room", function(data){
+                        client.roomid = data.roomid;
+                    
+                        $(".step#one").hide();
+                        $(".step#two").show();
+                        
+                        showConnectPhoneMesg();
+                    });
+                });
+                
+                // Create a new room
+                $(document).on("click", "a.joinroom", function(e){
+                    e.preventDefault();
+                    var roomID = $(this).attr("data-id");
+                    
+                    socket.emit("join room", roomID, function(data){
+                        if(data.joined == true){
+                            client.roomid = roomID;
+                            
+                            $(".step#one").hide();
+                            $(".step#two").show();
+                            
+                            showConnectPhoneMesg();
+                        }
+                        else{
+                            alert("Can't join that room, reason: " + data.error);
+                        }
+                    });
+                });
+                
+                /* Start the game */
+                $("input[name='startgame']").click(function(e){
+                    e.preventDefault();
+                    $(".step#two").hide();
+                    $(".step#three").show();
+                    
+                    socket.emit("start game", function(){
+                        startDrawing();
+                    });
+                });
+                
+                socket.on("game started", function(){
+                    $(".step#two").hide();
+                    $(".step#three").show();
+                    
+                    startDrawing();
+                });
+                
+                function showConnectPhoneMesg(){
+                    var createcode = client.roomid;
+                    $(".step#two .roomid").text(createcode);
+                };
+                
+                var ctx;
+                function startDrawing(){
+                    
+                    var canvas = document.getElementById("pong");
+                    canvas.height = 750;
+                    canvas.width = 750;
+                    ctx = canvas.getContext("2d");
+                    
+                    socket.on("update game", function(cors){
+                        ctx.clearRect(0,0,750,750);
+                        
+                        ctx.beginPath();
+                        ctx.arc(cors.ball.x, cors.ball.y, 8, 0, 2*Math.PI);
+                        ctx.fillStyle = 'black';
+                        ctx.fill();
+                        
+                        /* Draw paddles */
+                        cors.players.forEach(function(player){
+                            ctx.rect(player.x, player.y, player.width, player.height);
+                            ctx.fillStyle = "black";
+                            ctx.fill();
+                        });
+                        
+                    });
+                    
+                }
+            });
+        </script>
+    </head>
+    <body>
+        <div class="lobbywrap">
+            <div class="step" id="one">
+                <p><a href="#" class="startnew">Start nieuw spel</a></p>
+                <p>Of selecteer bestaand spel</p>
+                <ul class="roomlist"></ul>
+            </div>
+            <div class="step" id="two">
+                <p>Grab your phone and go to <b>http://192.168.2.21/mobile</b> and enter the following code: <b><span class="roomid">0000</span></b></p>
+                <h2>Players:</h2>
+                <ul class="playerlist"></ul>
+                
+                <input type="button" name="startgame" value="Start game" style="display: none;"/>
+                
+            </div>
+            <div class="step" id="three">
+                <canvas id="pong" width="750" height="750" style="border: 5px solid black;"/>
+            </div>
+            
+        </div>
+        <div class="seconds"></div>
+        
+    </body>
+</html>

@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Pong Device - TakeTwo</title>
+        
+        <script src="//code.jquery.com/jquery-1.11.0.min.js"></script>
+        <script src="//code.jquery.com/jquery-migrate-1.2.1.min.js"></script>
+        <script src="/socket.io/socket.io.js"></script>
+        
+        <script>
+            var registered = false;
+            var startOrientation = null;
+            var socket;
+            var client;
+            
+            $(document).ready(function(){
+                $(".step").hide();
+                $(".step#one").show();
+                
+                socket = io.connect("192.168.2.21");
+                
+                $("#joinroom").click(function(){
+                    // Send the new device to the server
+                    var roomid = $("input[name='code']").val();
+                    socket.emit("connect mobile", roomid, function(data){
+                            if(data.joined){
+                                registered = true;
+                                $(".step#one").hide();
+                                $(".step#two").show();
+                                
+                                window.addEventListener('deviceorientation', deviceOrientationHandler);
+                            }
+                            else{
+                                $('.step#one').append(data.error);
+                            }
+                        }
+                    );
+                });
+                
+                function deviceOrientationHandler(event) {
+                    if(startOrientation == null && event.alpha != 0 && event.beta != 0){
+                        startOrientation = {alpha: event.alpha, beta: event.beta};
+                    }
+                    
+                    if(registered && startOrientation != null){
+                        socket.emit('update movement', { 
+                                alpha: -Math.round(event.alpha - startOrientation.alpha), 
+                                beta: Math.round(event.beta - startOrientation.beta)
+                        });
+                        $("body").html(Math.round(event.alpha - startOrientation.alpha) + "<br>" + Math.round(event.beta - startOrientation.beta));
+                    }
+                }
+                
+            });
+            
+        </script>
+    </head>
+    <body>
+        <div class="step" id="one">
+            <p>Enter the given code</p>
+            <p><input type="text" name="code" placeholder="0000"/><br><input type="submit" name="submit" id="joinroom" value="Join room"></p>
+        </div>
+        <div class="step" id="two">
+            <p>Move your phone to control the paddle</p>
+        </div>
+    </body>
+</html>
